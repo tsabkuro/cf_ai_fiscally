@@ -1,5 +1,6 @@
 import { DurableObject } from 'cloudflare:workers'
 import { Hono } from 'hono'
+import { cors } from 'hono/cors'
 
 export interface Env {
   AI: Ai
@@ -30,6 +31,8 @@ type ChatHistoryEntry = {
 const MODEL = '@cf/meta/llama-3.3-70b-instruct-fp8-fast'
 
 const app = new Hono<{ Bindings: Env }>()
+
+app.use('/*', cors({ origin: '*', allowMethods: ['GET', 'POST', 'OPTIONS'], allowHeaders: ['Content-Type'] }))
 
 app.post('/api/chat/add', async (c) => {
   const payload = await c.req.json()
@@ -125,6 +128,8 @@ app.post('/api/chat', async (c) => {
   const resp = await stub.fetch(forwarded)
   const response = new Response(resp.body, resp)
   response.headers.set('X-Session-Id', sessionId)
+  response.headers.set('Access-Control-Allow-Origin', '*')
+  response.headers.set('Access-Control-Allow-Headers', '*')
   return response
 })
 
@@ -141,6 +146,8 @@ app.post('/api/transaction', async (c) => {
   const resp = await stub.fetch(forwarded)
   const response = new Response(resp.body, resp)
   response.headers.set('X-Session-Id', sessionId)
+  response.headers.set('Access-Control-Allow-Origin', '*')
+  response.headers.set('Access-Control-Allow-Headers', '*')
   return response
 })
 
@@ -156,6 +163,8 @@ app.post('/api/reset', async (c) => {
   const resp = await stub.fetch(forwarded)
   const response = new Response(resp.body, resp)
   response.headers.set('X-Session-Id', sessionId)
+  response.headers.set('Access-Control-Allow-Origin', '*')
+  response.headers.set('Access-Control-Allow-Headers', '*')
   return response
 })
 
