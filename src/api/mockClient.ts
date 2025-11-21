@@ -134,8 +134,8 @@ export async function aiAddTransaction({ instruction }: AiAddRequest): Promise<A
 }
 
 export async function resetData(): Promise<void> {
-  await delay(50)
   transactions = []
+  await request(`/api/reset`, { method: 'POST' })
 }
 
 export const mockApi = {

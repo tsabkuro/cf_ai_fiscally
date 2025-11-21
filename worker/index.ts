@@ -33,7 +33,7 @@ const MODEL = '@cf/meta/llama-3.3-70b-instruct-fp8-fast'
 
 const app = new Hono<{ Bindings: Env }>()
 
-// add another app.post for the one-shot model that just adds transactions.
+// TODO: add another app.post for the one-shot model that just adds transactions.
 
 app.post('/api/chat', async (c) => {
   const sessionId = c.req.query('session') ?? crypto.randomUUID()
@@ -67,6 +67,21 @@ app.post('/api/transaction', async (c) => {
   return response
 })
 
+app.post('/api/reset', async (c) => {
+  const sessionId = c.req.query('session') ?? crypto.randomUUID()
+  const stub = c.env.SESSION_DO.get(c.env.SESSION_DO.idFromName(sessionId))
+
+  const forwarded = new Request(c.req.url, {
+    method: c.req.method,
+    headers: c.req.raw.headers,
+  })
+
+  const resp = await stub.fetch(forwarded)
+  const response = new Response(resp.body, resp)
+  response.headers.set('X-Session-Id', sessionId)
+  return response
+})
+
 app.get('/api/health', (c) => c.json({ ok: true }))
 
 export default app
@@ -85,6 +100,13 @@ export class SessionDo extends DurableObject {
   async fetch(request: Request) {
     const url = new URL(request.url)
 
+    if (url.pathname == '/api/reset') {
+      await this.state.storage.put('history', '[]')
+      return Response.json({
+        sessionId: this.state.id.toString()
+      })
+    }
+
     let parsedBody: unknown;
     try {
       parsedBody = await request.json()
@@ -99,15 +121,16 @@ export class SessionDo extends DurableObject {
         return new Response('Missing description or amountCents', { status: 400 })
       }
 
+      const entryDate = tx.date ?? new Date(tx.date ?? Date.now()).toISOString()
       const entry: ChatHistoryEntry = {
         role: 'user',
         description: tx.description,
         amount: tx.amountCents / 100,
         category: tx.category ?? 'Uncategorized',
         notes: tx.notes,
-        date: tx.date ?? Date.now().toLocaleString(),
+        date: entryDate,
         ts: Date.now(),
-        content: `On ${tx.date} - ${tx.description} (${tx.category ?? 'Uncategorized'}) for $${(tx.amountCents / 100).toFixed(2)}${tx.notes ? ` — ${tx.notes}` : ''}`,
+        content: `On ${entryDate} - ${tx.description} (${tx.category ?? 'Uncategorized'}) for $${(tx.amountCents / 100).toFixed(2)}${tx.notes ? ` — ${tx.notes}` : ''}`,
       }
 
       const historyJson = (await this.state.storage.get<string>('history')) ?? '[]'
@@ -167,7 +190,7 @@ export class SessionDo extends DurableObject {
           role: entry.role,
           content:
             entry.content ??
-            `On ${entry.date} - ${entry.description ?? ''} (${entry.category ?? 'Uncategorized'}) for $${((entry.amount ?? 0) / 100).toFixed(2)}${entry.notes ? ` — ${entry.notes}` : ''}`,
+            `On ${entry.date} - ${entry.description ?? ''} (${entry.category ?? 'Uncategorized'}) for $${((entry.amount ?? 0)).toFixed(2)}${entry.notes ? ` — ${entry.notes}` : ''}`,
         })),
         { role: userEntry.role, content: userEntry.content ?? '' },
       ]
