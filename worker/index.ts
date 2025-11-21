@@ -18,9 +18,10 @@ type ChatPayload = {
 } & Partial<TransactionPayload>
 
 type ChatHistoryEntry = {
+  id?: string
   role: 'user' | 'assistant'
   description?: string
-  amount?: number
+  amountCents?: number
   category?: string
   date?: string
   content?: string
@@ -45,21 +46,24 @@ const addCors = (res: Response) => {
 app.options('/api/chat', () => addCors(new Response(null, { status: 204 })))
 app.options('/api/chat/add', () => addCors(new Response(null, { status: 204 })))
 app.options('/api/transaction', () => addCors(new Response(null, { status: 204 })))
+app.options('/api/transactions', () => addCors(new Response(null, { status: 204 })))
 app.options('/api/reset', () => addCors(new Response(null, { status: 204 })))
 
 app.post('/api/chat/add', async (c) => {
   const payload = await c.req.json()
-  const submittedMessages = Array.isArray(payload?.instruction)
+  const submittedMessages = Array.isArray(payload?.messages)
     ? payload.messages
     : Array.isArray(payload)
       ? payload
-      : payload?.instruction
+      : typeof payload?.instruction === 'string'
         ? [{ role: 'user', content: payload.instruction }]
-        : []
+        : typeof payload?.message === 'string'
+          ? [{ role: 'user', content: payload.message }]
+          : []
 
   const messages = [...submittedMessages]
 
-  console.log({submittedMessages: messages})
+  console.log({ submittedMessages: messages })
 
   const sessionId = c.req.query('session') ?? crypto.randomUUID()
   messages.unshift({
@@ -106,6 +110,7 @@ app.post('/api/chat/add', async (c) => {
     ? result.tool_calls.find((call: any) => call.name === 'addTransaction')
     : null
   let added = false
+  let transaction: any = undefined
 
   if (toolCall) {
     const args = toolCall && typeof toolCall.arguments === 'string'
@@ -122,9 +127,18 @@ app.post('/api/chat/add', async (c) => {
       }),
     })
     added = resp.ok
+    if (added) {
+      try {
+        transaction = await resp.json()
+      } catch {
+        transaction = undefined
+      }
+    }
   }
 
-  return addCors(Response.json({ added, result, sessionId }))
+  const res = addCors(Response.json({ added, transaction, sessionId }))
+  res.headers.set('X-Session-Id', sessionId)
+  return res
 })
 
 app.post('/api/chat', async (c) => {
@@ -154,6 +168,15 @@ app.post('/api/transaction', async (c) => {
   })
 
   const resp = await stub.fetch(forwarded)
+  const response = new Response(resp.body, resp)
+  response.headers.set('X-Session-Id', sessionId)
+  return addCors(response)
+})
+
+app.get('/api/transactions', async (c) => {
+  const sessionId = c.req.query('session') ?? crypto.randomUUID()
+  const stub = c.env.SESSION_DO.get(c.env.SESSION_DO.idFromName(sessionId))
+  const resp = await stub.fetch(new URL('/api/transactions', c.req.url), { method: 'GET' })
   const response = new Response(resp.body, resp)
   response.headers.set('X-Session-Id', sessionId)
   return addCors(response)
@@ -216,6 +239,30 @@ export class SessionDo extends DurableObject {
       )
     }
 
+    if (url.pathname === '/api/transactions') {
+      const historyJson = (await this.state.storage.get<string>('history')) ?? '[]'
+      let history: ChatHistoryEntry[] = []
+      try {
+        history = JSON.parse(historyJson)
+      } catch {
+        history = []
+      }
+      const transactionsOnly = history
+        .filter((h) => typeof h.description === 'string' && typeof h.amountCents === 'number')
+        .map((h) => ({
+          id: h.id ?? `tx-${h.ts}`,
+          date: (h.date ?? new Date(h.ts).toISOString()).toString().slice(0, 10),
+          description: h.description as string,
+          amountCents: h.amountCents as number,
+          category: h.category ?? 'Uncategorized',
+        }))
+      return addCors(
+        new Response(JSON.stringify(transactionsOnly), {
+          headers: { 'Content-Type': 'application/json' },
+        }),
+      )
+    }
+
     let parsedBody: unknown;
     try {
       parsedBody = await request.json()
@@ -230,11 +277,13 @@ export class SessionDo extends DurableObject {
         return addCors(new Response('Missing description or amountCents', { status: 400 }))
       }
 
-      const entryDate = tx.date ?? new Date(tx.date ?? Date.now()).toISOString()
+      const entryDate = tx.date ?? new Date(tx.date ?? Date.now()).toISOString().slice(0, 10)
+      const entryId = (tx as any).id ?? crypto.randomUUID()
       const entry: ChatHistoryEntry = {
+        id: entryId,
         role: 'user',
         description: tx.description,
-        amount: tx.amountCents / 100,
+        amountCents: tx.amountCents,
         category: tx.category ?? 'Uncategorized',
         date: entryDate,
         ts: Date.now(),
@@ -252,7 +301,11 @@ export class SessionDo extends DurableObject {
       history.push(entry)
       console.log("history in api/transaction", history)
       await this.state.storage.put('history', JSON.stringify(history))
-      return addCors(Response.json(entry))
+      return addCors(
+        new Response(JSON.stringify(entry), {
+          headers: { 'Content-Type': 'application/json' },
+        }),
+      )
     }
 
     else if (url.pathname == '/api/chat') {
@@ -300,7 +353,7 @@ export class SessionDo extends DurableObject {
           role: entry.role,
           content:
             entry.content ??
-            `On ${entry.date} - ${entry.description ?? ''} (${entry.category ?? 'Uncategorized'}) for $${((entry.amount ?? 0)).toFixed(2)}`,
+            `On ${entry.date} - ${entry.description ?? ''} (${entry.category ?? 'Uncategorized'}) for $${(((entry.amountCents ?? 0) as number) / 100).toFixed(2)}`,
         })),
         { role: userEntry.role, content: userEntry.content ?? '' },
       ]
@@ -318,11 +371,16 @@ export class SessionDo extends DurableObject {
 
       await this.state.storage.put('history', JSON.stringify(history))
 
-      return addCors(Response.json({
-        reply: replyText,
-        sessionId: this.state.id.toString(),
-        history,
-      }))
+      return addCors(
+        new Response(
+          JSON.stringify({
+            reply: replyText,
+            sessionId: this.state.id.toString(),
+            history,
+          }),
+          { headers: { 'Content-Type': 'application/json' } },
+        ),
+      )
     }
 
     return addCors(new Response('Not found', { status: 404 }))
