@@ -33,5 +33,6 @@ Make sure `.env` sets `VITE_API_BASE=/` for local proxying.
 
 - **AI Add:** Use the “AI add” card, type an instruction (e.g., “Add coffee in food & drink for $4.50”), and watch the Worker add the transaction.
 - **Chat:** Use the “Chat about your spend” card to ask follow-up questions; the Durable Object already includes any transactions added via AI or manual entry for the current session.
+- **Manual Add:** You can also manually add a transaction if necessary, to test the Chat feature.
 
 For more details, see `worker/index.ts` and `src/api/apiClient.ts`.
