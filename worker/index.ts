@@ -51,6 +51,7 @@ app.options('/api/reset', () => addCors(new Response(null, { status: 204 })))
 
 app.post('/api/chat/add', async (c) => {
   const payload = await c.req.json()
+  console.log("Payload: ", payload)
   const submittedMessages = Array.isArray(payload?.messages)
     ? payload.messages
     : Array.isArray(payload)
@@ -158,6 +159,7 @@ app.post('/api/chat', async (c) => {
 })
 
 app.post('/api/transaction', async (c) => {
+  console.log("Transaction called")
   const sessionId = c.req.query('session') ?? crypto.randomUUID()
   const stub = c.env.SESSION_DO.get(c.env.SESSION_DO.idFromName(sessionId))
 

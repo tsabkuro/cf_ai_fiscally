@@ -24,6 +24,17 @@ const cents = (n: number) => Math.round(n)
 
 const API_BASE = (import.meta.env.VITE_API_BASE ?? import.meta.env.BASE_URL ?? '').replace(/\/$/, '')
 
+const ensureSessionId = () => {
+  if (!sessionId) {
+    const stored = typeof window !== 'undefined' ? window.localStorage.getItem('sessionId') : null
+    sessionId = stored ?? crypto.randomUUID()
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem('sessionId', sessionId)
+    }
+  }
+  return sessionId
+}
+
 export async function listTransactions(): Promise<Transaction[]> {
   return await request<Transaction[]>(`/api/transactions`, { method: 'GET' })
 }
@@ -60,14 +71,20 @@ export async function getSummary(): Promise<Summary> {
 
 const request = async <T>(path: string, opts?: RequestInit) => {
   const url = new URL(`${API_BASE}${path}`, window.location.origin)
-  if (sessionId) url.searchParams.set('session', sessionId)
+  url.searchParams.set('session', ensureSessionId())
 
   const res = await fetch(url.toString(), {
     ...opts,
     headers: { 'Content-Type': 'application/json', ...opts?.headers },
   })
 
-  sessionId = res.headers.get('X-Session-Id') ?? sessionId
+  const returnedSession = res.headers.get('X-Session-Id')
+  if (returnedSession) {
+    sessionId = returnedSession
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem('sessionId', sessionId)
+    }
+  }
 
   if (!res.ok) throw new Error(`${res.status}: ${res.statusText}`)
   if (res.status === 204) return undefined as T
