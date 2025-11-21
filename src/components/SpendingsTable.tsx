@@ -62,7 +62,6 @@ export function SpendingsTable({ transactions, onCreate }: SpendingsTableProps) 
             <div className="table-row" key={tx.id}>
               <div>
                 <div className="title">{tx.description}</div>
-                {tx.notes && <div className="muted">{tx.notes}</div>}
               </div>
               <span className="pill">{tx.category}</span>
               <span className="right">{formatMoney(tx.amountCents)}</span>

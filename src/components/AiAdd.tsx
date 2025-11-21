@@ -16,9 +16,17 @@ export function AiAdd({ onCreated }: AiAddProps) {
     setSubmitting(true)
     try {
       const res = await mockApi.aiAddTransaction({ instruction })
-      setReply(res.reply)
-      setInstruction('')
-      await onCreated()
+      if (res.added && typeof res.response !== 'string') {
+        const tx = res.response
+        const friendlyAmount = `$${(tx.amountCents / 100).toFixed(2)}`
+        setReply(`Added ${tx.description} in ${tx.category} for ${friendlyAmount}.`)
+        setInstruction('')
+        await onCreated()
+      } else if (typeof res.response === 'string') {
+        setReply(res.response)
+      } else {
+        setReply('Unable to add that transaction. Please try again.')
+      }
     } finally {
       setSubmitting(false)
     }

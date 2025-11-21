@@ -9,7 +9,6 @@ export function QuickAdd({ onCreate }: QuickAddProps) {
   const [description, setDescription] = useState('')
   const [amount, setAmount] = useState('')
   const [category, setCategory] = useState('')
-  const [note, setNote] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
   async function handleSubmit(e: FormEvent) {
@@ -21,12 +20,10 @@ export function QuickAdd({ onCreate }: QuickAddProps) {
         description,
         amountCents: Math.round(parseFloat(amount) * 100),
         category: category || 'Uncategorized',
-        notes: note || undefined,
       })
       setDescription('')
       setAmount('')
       setCategory('')
-      setNote('')
     } finally {
       setSubmitting(false)
     }
@@ -57,10 +54,6 @@ export function QuickAdd({ onCreate }: QuickAddProps) {
           <label className="field">
             <span>Category</span>
             <input value={category} onChange={(e) => setCategory(e.target.value)} placeholder="e.g. Groceries" required />
-          </label>
-          <label className="field">
-            <span>Note</span>
-            <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="optional" />
           </label>
         </div>
         <button type="submit" disabled={submitting}>

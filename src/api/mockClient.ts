@@ -6,7 +6,6 @@ export type Transaction = {
   description: string
   amountCents: number
   category: string
-  notes?: string
 }
 
 export type Summary = {
@@ -18,7 +17,8 @@ export type Summary = {
 export type ChatRequest = { message: string }
 export type ChatResponse = { reply: string }
 export type AiAddRequest = { instruction: string }
-export type AiAddResponse = { reply: string; transaction: Transaction }
+export type AiAddResponse = { added: boolean, response: Transaction | string }
+export type AiAddServerResponse = { added: boolean, result: any }
 
 let transactions: Transaction[] = []
 
@@ -39,7 +39,6 @@ export type CreateTransactionInput = {
   description: string
   amountCents: number
   category?: string
-  notes?: string
   date?: string
 }
 
@@ -51,7 +50,6 @@ export async function createTransaction(input: CreateTransactionInput): Promise<
     description: input.description,
     amountCents: cents(input.amountCents),
     category: input.category ?? 'Uncategorized',
-    notes: input.notes,
   }
   transactions = [tx, ...transactions]
 
@@ -99,38 +97,31 @@ export async function chat({ message }: ChatRequest): Promise<ChatResponse> {
   return await request(`/api/chat`, { method: 'POST', body: JSON.stringify({ message }) })
 }
 
-function parseInstruction(instruction: string) {
-  const amountMatch = instruction.match(/(?:costs?|for|at)\s*\$?([\d,.]+)/i)
-  const categoryMatch = instruction.match(/in\s+(.+?)\s+category/i)
-  const descriptionMatch = instruction.match(/add\s+([^,]+?)(?:,| in\b|$)/i)
-
-  const amount = amountMatch ? parseFloat(amountMatch[1].replace(/,/g, '')) : NaN
-  const amountCents = Number.isFinite(amount) ? cents(amount * 100) : 0
-  const category = categoryMatch ? categoryMatch[1].trim() : 'Uncategorized'
-  const description = descriptionMatch ? descriptionMatch[1].trim() : instruction.trim()
-
-  return { amountCents, category, description }
-}
-
 export async function aiAddTransaction({ instruction }: AiAddRequest): Promise<AiAddResponse> {
-  await delay(120)
-  const parsed = parseInstruction(instruction)
+  console.log("sending instruction", instruction)
+  const res = await request<AiAddServerResponse>(`/api/chat/add`, { method: 'POST', body: JSON.stringify({ instruction }) })
 
-  const transaction = await createTransaction({
-    description: parsed.description || 'Untitled',
-    amountCents: parsed.amountCents || 0,
-    category: parsed.category,
-    notes: 'Added via AI instruction',
-  })
+  if (res.added) {
+    const call = res.result.tool_calls?.find((tool: any) => tool.name === 'addTransaction')
+    console.log('call', call)
+    const args =
+      call?.arguments && typeof call.arguments === 'string'
+        ? JSON.parse(call.arguments)
+        : (call?.arguments as Record<string, unknown>) ?? {}
 
-  const friendlyAmount = `$${(transaction.amountCents / 100).toFixed(2)}`
-  const reply = [
-    `Received: "${instruction}".`,
-    `Added "${transaction.description}" to ${transaction.category} for ${friendlyAmount}.`,
-    'This is a mock AI add flow; wire up to Workers AI later.',
-  ].join(' ')
+    console.log('args', args)
+    const transaction: Transaction = {
+      id: nextId(),
+      date: new Date().toISOString().slice(0, 10),
+      description: String(args.description ?? 'Untitled'),
+      amountCents: cents(Number(args.amount ?? 0) * 100),
+      category: String(args.category ?? 'Uncategorized'),
+    }
+    transactions = [transaction, ...transactions]
+    return { added: true, response: transaction }
+  }
 
-  return { reply, transaction }
+  return { added: false, response: res.result.response ?? "Unable to parse. Please correct your message" }
 }
 
 export async function resetData(): Promise<void> {
