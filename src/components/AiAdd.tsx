@@ -1,14 +1,20 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { mockApi } from '../api/apiClient'
 
 type AiAddProps = {
   onCreated: () => Promise<void>
+  resetToken: number
 }
 
-export function AiAdd({ onCreated }: AiAddProps) {
+export function AiAdd({ onCreated, resetToken }: AiAddProps) {
   const [instruction, setInstruction] = useState('')
   const [reply, setReply] = useState('')
   const [submitting, setSubmitting] = useState(false)
+
+  useEffect(() => {
+    setInstruction('')
+    setReply('')
+  }, [resetToken])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()

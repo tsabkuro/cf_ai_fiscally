@@ -12,6 +12,7 @@ function App() {
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [summary, setSummary] = useState<Summary | null>(null)
   const [loading, setLoading] = useState(true)
+  const [resetToken, setResetToken] = useState(0)
 
   useEffect(() => {
     refresh()
@@ -35,6 +36,7 @@ function App() {
     try {
       await mockApi.resetData()
       await refresh()
+      setResetToken((t) => t + 1)
     } finally {
       setLoading(false)
     }
@@ -57,12 +59,12 @@ function App() {
 
       <div className="section grid-2">
         <QuickAdd onCreate={handleCreate} />
-        <AiAdd onCreated={refresh} />
+        <AiAdd onCreated={refresh} resetToken={resetToken} />
       </div>
 
       <div className="section grid-2">
         <Categories transactions={transactions} />
-        <AiChat />
+        <AiChat resetToken={resetToken} />
       </div>
 
       <div className="section">

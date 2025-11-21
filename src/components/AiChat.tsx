@@ -1,10 +1,16 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { mockApi } from '../api/apiClient'
 
-export function AiChat() {
+type AiChatProps = { resetToken: number }
+
+export function AiChat({ resetToken }: AiChatProps) {
   const [message, setMessage] = useState('')
   const [reply, setReply] = useState('')
   const [sending, setSending] = useState(false)
+  useEffect(() => {
+    setMessage('')
+    setReply('')
+  }, [resetToken])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
