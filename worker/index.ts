@@ -1,6 +1,5 @@
 import { DurableObject } from 'cloudflare:workers'
 import { Hono } from 'hono'
-import { cors } from 'hono/cors'
 
 export interface Env {
   AI: Ai
@@ -32,18 +31,21 @@ const MODEL = '@cf/meta/llama-3.3-70b-instruct-fp8-fast'
 
 const app = new Hono<{ Bindings: Env }>()
 
-app.use('*', cors({ origin: '*', allowMethods: ['GET', 'POST', 'OPTIONS'], allowHeaders: ['Content-Type'] }))
+const corsHeaders: Record<string, string> = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'Content-Type, X-Session-Id',
+  'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
+}
 
-app.options('*', (c) =>
-  new Response(null, {
-    status: 204,
-    headers: {
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Headers': 'Content-Type',
-      'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
-    },
-  }),
-)
+const addCors = (res: Response) => {
+  Object.entries(corsHeaders).forEach(([k, v]) => res.headers.set(k, v))
+  return res
+}
+
+app.options('/api/chat', () => addCors(new Response(null, { status: 204 })))
+app.options('/api/chat/add', () => addCors(new Response(null, { status: 204 })))
+app.options('/api/transaction', () => addCors(new Response(null, { status: 204 })))
+app.options('/api/reset', () => addCors(new Response(null, { status: 204 })))
 
 app.post('/api/chat/add', async (c) => {
   const payload = await c.req.json()
@@ -57,7 +59,7 @@ app.post('/api/chat/add', async (c) => {
 
   const messages = [...submittedMessages]
 
-  // console.log({submittedMessages: messages})
+  console.log({submittedMessages: messages})
 
   const sessionId = c.req.query('session') ?? crypto.randomUUID()
   messages.unshift({
@@ -122,8 +124,7 @@ app.post('/api/chat/add', async (c) => {
     added = resp.ok
   }
 
-  // console.log('Added with response', result)
-  return Response.json({ added, result, sessionId })
+  return addCors(Response.json({ added, result, sessionId }))
 })
 
 app.post('/api/chat', async (c) => {
@@ -139,9 +140,7 @@ app.post('/api/chat', async (c) => {
   const resp = await stub.fetch(forwarded)
   const response = new Response(resp.body, resp)
   response.headers.set('X-Session-Id', sessionId)
-  response.headers.set('Access-Control-Allow-Origin', '*')
-  response.headers.set('Access-Control-Allow-Headers', '*')
-  return response
+  return addCors(response)
 })
 
 app.post('/api/transaction', async (c) => {
@@ -157,26 +156,36 @@ app.post('/api/transaction', async (c) => {
   const resp = await stub.fetch(forwarded)
   const response = new Response(resp.body, resp)
   response.headers.set('X-Session-Id', sessionId)
-  response.headers.set('Access-Control-Allow-Origin', '*')
-  response.headers.set('Access-Control-Allow-Headers', '*')
-  return response
+  return addCors(response)
 })
+
+app.options('/api/reset', () =>
+  new Response(null, {
+    status: 204,
+    headers: {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Headers': 'Content-Type, X-Session-Id',
+      'Access-Control-Allow-Methods': 'POST,OPTIONS',
+    },
+  }),
+)
 
 app.post('/api/reset', async (c) => {
   const sessionId = c.req.query('session') ?? crypto.randomUUID()
   const stub = c.env.SESSION_DO.get(c.env.SESSION_DO.idFromName(sessionId))
+  console.log("run2")
 
   const forwarded = new Request(c.req.url, {
     method: c.req.method,
     headers: c.req.raw.headers,
   })
 
+
   const resp = await stub.fetch(forwarded)
   const response = new Response(resp.body, resp)
+
   response.headers.set('X-Session-Id', sessionId)
-  response.headers.set('Access-Control-Allow-Origin', '*')
-  response.headers.set('Access-Control-Allow-Headers', '*')
-  return response
+  return addCors(response)
 })
 
 app.get('/api/health', (c) => c.json({ ok: true }))
@@ -199,23 +208,26 @@ export class SessionDo extends DurableObject {
 
     if (url.pathname == '/api/reset') {
       await this.state.storage.put('history', '[]')
-      return Response.json({
-        sessionId: this.state.id.toString()
-      })
+      return addCors(
+        new Response(JSON.stringify({ sessionId: this.state.id.toString() }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+      )
     }
 
     let parsedBody: unknown;
     try {
       parsedBody = await request.json()
     } catch (err) {
-      return new Response('Invalid JSON body', { status: 400 })
+      return addCors(new Response('Invalid JSON body', { status: 400 }))
     }
 
     if (url.pathname == '/api/transaction') {
       // add transaction to history
       const tx = parsedBody as Partial<TransactionPayload>
       if (typeof tx.description !== 'string' || typeof tx.amountCents !== 'number') {
-        return new Response('Missing description or amountCents', { status: 400 })
+        return addCors(new Response('Missing description or amountCents', { status: 400 }))
       }
 
       const entryDate = tx.date ?? new Date(tx.date ?? Date.now()).toISOString()
@@ -238,9 +250,9 @@ export class SessionDo extends DurableObject {
         history = []
       }
       history.push(entry)
-      // console.log("history in api/transaction", history)
+      console.log("history in api/transaction", history)
       await this.state.storage.put('history', JSON.stringify(history))
-      return Response.json(entry)
+      return addCors(Response.json(entry))
     }
 
     else if (url.pathname == '/api/chat') {
@@ -248,10 +260,10 @@ export class SessionDo extends DurableObject {
       const body = parsedBody as ChatPayload
       const incomingMessage = typeof body.message === 'string' ? body.message.trim() : undefined
       if (!incomingMessage) {
-        return new Response('Missing "message"', { status: 400 })
+        return addCors(new Response('Missing "message"', { status: 400 }))
       }
 
-      // console.log('incoming message for /api/chat', incomingMessage)
+      console.log('incoming message for /api/chat', incomingMessage)
 
       const historyJson = (await this.state.storage.get<string>('history')) ?? '[]'
       let history: ChatHistoryEntry[] = []
@@ -262,7 +274,7 @@ export class SessionDo extends DurableObject {
         history = []
       }
 
-      // console.log("/api/chat history", history)
+      console.log("/api/chat history", history)
 
       const userEntry: ChatHistoryEntry = {
         role: 'user',
@@ -306,13 +318,13 @@ export class SessionDo extends DurableObject {
 
       await this.state.storage.put('history', JSON.stringify(history))
 
-      return Response.json({
+      return addCors(Response.json({
         reply: replyText,
         sessionId: this.state.id.toString(),
         history,
-      })
+      }))
     }
 
-    return new Response('Not found', { status: 404 })
+    return addCors(new Response('Not found', { status: 404 }))
   }
 }
