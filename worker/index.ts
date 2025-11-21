@@ -106,6 +106,7 @@ app.post('/api/chat/add', async (c) => {
     messages,
     tools
   });
+  console.log('chat/add tool_calls', result.tool_calls)
 
   const toolCall = Array.isArray(result.tool_calls)
     ? result.tool_calls.find((call: any) => call.name === 'addTransaction')
@@ -117,8 +118,10 @@ app.post('/api/chat/add', async (c) => {
     const args = toolCall && typeof toolCall.arguments === 'string'
       ? JSON.parse(toolCall.arguments)
       : toolCall?.arguments ?? {}
+    console.log('chat/add parsed args', args)
 
-    const resp = await fetch(new URL(`/api/transaction?session=${sessionId}`, c.req.url), {
+    const stub = c.env.SESSION_DO.get(c.env.SESSION_DO.idFromName(sessionId))
+    const resp = await stub.fetch(new Request('https://do.internal/api/transaction', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -126,7 +129,9 @@ app.post('/api/chat/add', async (c) => {
         amountCents: Math.round((args.amount ?? 0) * 100),
         category: args.category ?? 'Uncategorized',
       }),
-    })
+    }))
+    const respClone = resp.clone()
+    console.log('chat/add transaction POST status', resp.status, 'body:', await respClone.text())
     added = resp.ok
     if (added) {
       try {
