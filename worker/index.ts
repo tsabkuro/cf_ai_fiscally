@@ -1,3 +1,4 @@
+import { DurableObject } from 'cloudflare:workers'
 import { Hono } from 'hono'
 
 export interface Env {
@@ -6,22 +7,27 @@ export interface Env {
 }
 
 type ChatBody = {
+  description?: string
+  amount?: number
+  category?: string
   notes?: string
-  message?: string
-  template?: string
 }
 
 type ChatHistoryEntry = {
   role: 'user' | 'assistant'
-  content: string
+  description?: string
+  amount?: number
+  category?: string
   notes?: string
-  template?: string
+  content?: string
   ts: number
 }
 
 const MODEL = '@cf/meta/llama-3.3-70b-instruct-fp8-fast'
 
 const app = new Hono<{ Bindings: Env }>()
+
+// add another app.post for the one-shot model that just adds transactions.
 
 app.post('/api/chat', async (c) => {
   const sessionId = c.req.query('session') ?? crypto.randomUUID()
@@ -43,12 +49,14 @@ app.get('/api/health', (c) => c.json({ ok: true }))
 
 export default app
 
-export class SessionDo {
-  private state: DurableObjectState
-  private env: Env
+export class SessionDo extends DurableObject {
+  protected state: DurableObjectState
+  protected env: Env
 
   constructor(state: DurableObjectState, env: Env) {
-    this.state = state
+    super(state, env)
+
+    this.state = state;
     this.env = env
   }
 
@@ -65,8 +73,10 @@ export class SessionDo {
       return new Response('Invalid JSON body', { status: 400 })
     }
 
-    if (!body.message) {
-      return new Response('Missing "message" in request body', { status: 400 })
+    if (!body.description) {
+      return new Response('Missing "description" in request body', { status: 400 })
+    } else if (!body.amount) {
+      return new Response('Missing "amount" n request body', {status: 400 })
     }
 
     const historyJson = (await this.state.storage.get<string>('history')) ?? '[]'
@@ -75,20 +85,41 @@ export class SessionDo {
     try {
       history = JSON.parse(historyJson)
     } catch {
+      console.error("History not found")
       history = []
     }
 
+    const formattedAmount = ((body.amount ?? 0) / 100).toFixed(2)
+    const userContent = `${body.description} (${body.category ?? 'Uncategorized'}) for $${formattedAmount}${body.notes ? ` — ${body.notes}` : ''}`
+
     history.push({
       role: 'user',
-      content: body.message,
+      description: body.description,
+      amount: body.amount,
+      category: body.category,
       notes: body.notes,
-      template: body.template,
       ts: Date.now(),
+      content: userContent,
     })
 
     const messages = [
-      { role: 'system', content: 'You give insights into spending habits' },
-      ...history.map(({ role, content }) => ({ role, content })),
+      {
+        role: 'system',
+        content: [
+          'You are a financial assistant embedded in a personal budgeting app.',
+          'Review the users spending, and answer their questions based on their transactions',
+          'Always reference the data we already have (no guessing).',
+          'If we have no data, let the user know they should add transactions first',
+          'Act like a cold calculating machine with no emotion',
+          'Reply in two short paragraphs followed by 2 bullet recommendations.',
+        ].join(' ')
+      },
+      ...history.map((entry) => ({
+        role: entry.role,
+        content:
+          entry.content ??
+          `${entry.description ?? ''} (${entry.category ?? 'Uncategorized'}) for $${((entry.amount ?? 0) / 100).toFixed(2)}${entry.notes ? ` — ${entry.notes}` : ''}`,
+      })),
     ]
 
     const aiReply = await this.env.AI.run(MODEL, { messages })
