@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { mockApi } from '../api/mockClient'
+import { mockApi } from '../api/apiClient'
 
 export function AiChat() {
   const [message, setMessage] = useState('')

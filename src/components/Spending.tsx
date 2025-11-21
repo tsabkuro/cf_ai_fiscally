@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react'
-import type { CreateTransactionInput } from '../api/mockClient'
+import type { CreateTransactionInput } from '../api/apiClient'
 
 export type QuickAddProps = {
   onCreate: (input: CreateTransactionInput) => Promise<void>

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { mockApi } from '../api/mockClient'
+import { mockApi } from '../api/apiClient'
 
 type AiAddProps = {
   onCreated: () => Promise<void>

@@ -1,4 +1,4 @@
-import type { Summary, Transaction } from '../api/mockClient'
+import type { Summary, Transaction } from '../api/apiClient'
 
 type StatsDashboardProps = {
   summary: Summary | null

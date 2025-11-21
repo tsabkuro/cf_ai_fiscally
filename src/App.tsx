@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { mockApi, type Transaction, type Summary, type CreateTransactionInput } from './api/mockClient'
+import { mockApi, type Transaction, type Summary, type CreateTransactionInput } from './api/apiClient'
 import StatsDashboard from './components/StatsDashboard'
 import SpendingsTable from './components/SpendingsTable'
 import Categories from './components/Categories'

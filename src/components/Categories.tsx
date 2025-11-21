@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import type { Transaction } from '../api/mockClient'
+import type { Transaction } from '../api/apiClient'
 
 type CategoryStat = {
   name: string

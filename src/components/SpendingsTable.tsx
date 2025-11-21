@@ -1,5 +1,5 @@
 import { useMemo, type FormEvent } from 'react'
-import type { CreateTransactionInput, Transaction } from '../api/mockClient'
+import type { CreateTransactionInput, Transaction } from '../api/apiClient'
 
 export type SpendingsTableProps = {
   transactions: Transaction[]
