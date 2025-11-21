@@ -1,69 +1,35 @@
-# React + TypeScript + Vite
+# Fiscally
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Fiscally is a Vite + React front end paired with a Cloudflare Worker + Durable Object that powers AI-assisted transaction tracking and chat insights. The Worker uses Cloudflare’s AI tooling to interpret free-form instructions, add transactions, and maintain per-session history, while the UI provides a simple budgeting dashboard.
 
-Currently, two official plugins are available:
+## Features
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- **AI Add:** Free-form instructions are parsed by a Cloudflare AI model that calls a tool to create transactions.
+- **Chat Insights:** A Durable Object stores per-session history so the chatbot can reference the latest spending data.
+- **Quick Add & Dashboard:** Manual entry, summaries, and tables remain available for traditional bookkeeping.
 
-## Expanding the ESLint configuration
+## Local Development
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+1. **Install dependencies**
+   ```bash
+   npm install
+   ```
+2. **Run the Worker locally**
+   ```bash
+   npx wrangler dev worker/index.ts
+   ```
+   Wrangler serves the API/Durable Object at `http://localhost:8787`.
+3. **Run the Vite dev server**
+   ```bash
+   npm run dev
+   ```
+   Vite proxies `/api/*` requests to the Worker (configure via `vite.config.ts`). Visit the printed URL (usually `http://localhost:5173`).
 
-```js
-export default tseslint.config([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+Make sure `.env` sets `VITE_API_BASE=/` for local proxying
 
-      // Remove tseslint.configs.recommended and replace with this
-      ...tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      ...tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      ...tseslint.configs.stylisticTypeChecked,
+## Testing AI flows
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+- **AI Add:** Use the “AI add” card, type an instruction (e.g., “Add coffee in food & drink for $4.50”), and watch the Worker add the transaction.
+- **Chat:** Use the “Chat about your spend” card to ask follow-up questions; the Durable Object already includes any transactions added via AI or manual entry for the current session.
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
-
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default tseslint.config([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+For more details, see `worker/index.ts` and `src/api/apiClient.ts`.
