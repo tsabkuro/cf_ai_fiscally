@@ -32,7 +32,18 @@ const MODEL = '@cf/meta/llama-3.3-70b-instruct-fp8-fast'
 
 const app = new Hono<{ Bindings: Env }>()
 
-app.use('/*', cors({ origin: '*', allowMethods: ['GET', 'POST', 'OPTIONS'], allowHeaders: ['Content-Type'] }))
+app.use('*', cors({ origin: '*', allowMethods: ['GET', 'POST', 'OPTIONS'], allowHeaders: ['Content-Type'] }))
+
+app.options('*', (c) =>
+  new Response(null, {
+    status: 204,
+    headers: {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Headers': 'Content-Type',
+      'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
+    },
+  }),
+)
 
 app.post('/api/chat/add', async (c) => {
   const payload = await c.req.json()
@@ -46,7 +57,7 @@ app.post('/api/chat/add', async (c) => {
 
   const messages = [...submittedMessages]
 
-  console.log({submittedMessages: messages})
+  // console.log({submittedMessages: messages})
 
   const sessionId = c.req.query('session') ?? crypto.randomUUID()
   messages.unshift({
@@ -111,7 +122,7 @@ app.post('/api/chat/add', async (c) => {
     added = resp.ok
   }
 
-  console.log('Added with response', result)
+  // console.log('Added with response', result)
   return Response.json({ added, result, sessionId })
 })
 
@@ -227,7 +238,7 @@ export class SessionDo extends DurableObject {
         history = []
       }
       history.push(entry)
-      console.log("history in api/transaction", history)
+      // console.log("history in api/transaction", history)
       await this.state.storage.put('history', JSON.stringify(history))
       return Response.json(entry)
     }
@@ -240,7 +251,7 @@ export class SessionDo extends DurableObject {
         return new Response('Missing "message"', { status: 400 })
       }
 
-      console.log('incoming message for /api/chat', incomingMessage)
+      // console.log('incoming message for /api/chat', incomingMessage)
 
       const historyJson = (await this.state.storage.get<string>('history')) ?? '[]'
       let history: ChatHistoryEntry[] = []
@@ -251,7 +262,7 @@ export class SessionDo extends DurableObject {
         history = []
       }
 
-      console.log("/api/chat history", history)
+      // console.log("/api/chat history", history)
 
       const userEntry: ChatHistoryEntry = {
         role: 'user',

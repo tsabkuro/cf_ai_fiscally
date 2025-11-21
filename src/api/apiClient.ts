@@ -98,18 +98,18 @@ export async function chat({ message }: ChatRequest): Promise<ChatResponse> {
 }
 
 export async function aiAddTransaction({ instruction }: AiAddRequest): Promise<AiAddResponse> {
-  console.log("sending instruction", instruction)
+  // console.log("sending instruction", instruction)
   const res = await request<AiAddServerResponse>(`/api/chat/add`, { method: 'POST', body: JSON.stringify({ instruction }) })
 
   if (res.added) {
     const call = res.result.tool_calls?.find((tool: any) => tool.name === 'addTransaction')
-    console.log('call', call)
+    // console.log('call', call)
     const args =
       call?.arguments && typeof call.arguments === 'string'
         ? JSON.parse(call.arguments)
         : (call?.arguments as Record<string, unknown>) ?? {}
 
-    console.log('args', args)
+    // console.log('args', args)
     const transaction: Transaction = {
       id: nextId(),
       date: new Date().toISOString().slice(0, 10),
