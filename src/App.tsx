@@ -30,16 +30,26 @@ function App() {
     await refresh()
   }
 
+  async function handleReset() {
+    setLoading(true)
+    try {
+      await mockApi.resetData()
+      await refresh()
+    } finally {
+      setLoading(false)
+    }
+  }
+
   return (
     <div className="page">
       <header className="hero">
         <div>
           <p className="eyebrow">Fiscally</p>
           <h1>Stay on top of your spending</h1>
-          <p className="muted">Temp mock</p>
         </div>
         <div className="hero-actions">
           <button onClick={refresh} disabled={loading}>{loading ? 'Loading…' : 'Refresh data'}</button>
+          <button onClick={handleReset} disabled={loading}>Reset data</button>
         </div>
       </header>
 

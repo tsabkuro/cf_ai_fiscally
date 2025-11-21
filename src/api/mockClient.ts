@@ -2,7 +2,7 @@ type Currency = 'USD'
 
 export type Transaction = {
   id: string
-  date: string // ISO date
+  date: string
   description: string
   amountCents: number
   category: string
@@ -21,7 +21,7 @@ export type ChatResponse = { reply: string }
 export type AiAddRequest = { instruction: string }
 export type AiAddResponse = { reply: string; transaction: Transaction }
 
-let transactions: Transaction[] = [
+const baseTransactions = (): Transaction[] => [
   {
     id: 't-1',
     date: new Date().toISOString().slice(0, 10),
@@ -48,6 +48,8 @@ let transactions: Transaction[] = [
     currency: 'USD',
   },
 ]
+
+let transactions: Transaction[] = baseTransactions()
 
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
@@ -154,10 +156,16 @@ export async function aiAddTransaction({ instruction }: AiAddRequest): Promise<A
   return { reply, transaction }
 }
 
+export async function resetData(): Promise<void> {
+  await delay(50)
+  transactions = []
+}
+
 export const mockApi = {
   listTransactions,
   createTransaction,
   getSummary,
   chat,
   aiAddTransaction,
+  resetData,
 }

@@ -16,7 +16,7 @@
 	"migrations": [
 		{
 			"tag": "v1",
-			"new_classes": ["SessionDo"]
+			"new_sqlite_classes": ["SessionDo"]
 		}
 	]
 }
