@@ -2,6 +2,8 @@
 
 Fiscally is a Vite + React front end paired with a Cloudflare Worker + Durable Object that powers AI-assisted transaction tracking and chat insights. The Worker uses Cloudflare’s AI tooling to interpret free-form instructions, add transactions, and maintain per-session history, while the UI provides a simple budgeting dashboard.
 
+Model Used: llama-3.3-70b-instruct-fp8-fast
+
 Live site: https://fiscally-4hs.pages.dev/
 
 ## Features
