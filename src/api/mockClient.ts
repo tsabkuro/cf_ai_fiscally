@@ -1,4 +1,4 @@
-type Currency = 'USD'
+let sessionId: string | null = null
 
 export type Transaction = {
   id: string
@@ -7,7 +7,6 @@ export type Transaction = {
   amountCents: number
   category: string
   notes?: string
-  currency: Currency
 }
 
 export type Summary = {
@@ -21,41 +20,15 @@ export type ChatResponse = { reply: string }
 export type AiAddRequest = { instruction: string }
 export type AiAddResponse = { reply: string; transaction: Transaction }
 
-const baseTransactions = (): Transaction[] => [
-  {
-    id: 't-1',
-    date: new Date().toISOString().slice(0, 10),
-    description: 'Coffee',
-    amountCents: 450,
-    category: 'Food & Drink',
-    notes: 'Oat milk latte',
-    currency: 'USD',
-  },
-  {
-    id: 't-2',
-    date: new Date().toISOString().slice(0, 10),
-    description: 'Groceries',
-    amountCents: 8200,
-    category: 'Groceries',
-    currency: 'USD',
-  },
-  {
-    id: 't-3',
-    date: new Date().toISOString().slice(0, 10),
-    description: 'Bus pass',
-    amountCents: 3000,
-    category: 'Transport',
-    currency: 'USD',
-  },
-]
-
-let transactions: Transaction[] = baseTransactions()
+let transactions: Transaction[] = []
 
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
 const cents = (n: number) => Math.round(n)
 
 const nextId = () => `t-${crypto.randomUUID()}`
+
+const API_BASE = (import.meta.env.VITE_API_BASE ?? import.meta.env.BASE_URL ?? '').replace(/\/$/, '')
 
 export async function listTransactions(): Promise<Transaction[]> {
   await delay(80)
@@ -68,7 +41,6 @@ export type CreateTransactionInput = {
   category?: string
   notes?: string
   date?: string
-  currency?: Currency
 }
 
 export async function createTransaction(input: CreateTransactionInput): Promise<Transaction> {
@@ -80,9 +52,11 @@ export async function createTransaction(input: CreateTransactionInput): Promise<
     amountCents: cents(input.amountCents),
     category: input.category ?? 'Uncategorized',
     notes: input.notes,
-    currency: input.currency ?? 'USD',
   }
   transactions = [tx, ...transactions]
+
+  await request(`/api/transaction`, { method: 'POST', body: JSON.stringify(tx) })
+
   return tx
 }
 
@@ -105,21 +79,24 @@ export async function getSummary(): Promise<Summary> {
   return { totalMonthCents, byCategory, topDeltas }
 }
 
+const request = async <T>(path: string, opts?: RequestInit) => {
+  const url = new URL(`${API_BASE}${path}`, window.location.origin)
+  if (sessionId) url.searchParams.set('session', sessionId)
+
+  const res = await fetch(url.toString(), {
+    ...opts,
+    headers: { 'Content-Type': 'application/json', ...opts?.headers },
+  })
+
+  sessionId = res.headers.get('X-Session-Id') ?? sessionId
+
+  if (!res.ok) throw new Error(`${res.status}: ${res.statusText}`)
+  if (res.status === 204) return undefined as T
+  return (await res.json()) as T
+}
+
 export async function chat({ message }: ChatRequest): Promise<ChatResponse> {
-  await delay(100)
-  const summary = await getSummary()
-  const top = Object.entries(summary.byCategory)
-    .sort((a, b) => b[1] - a[1])
-    .map(([category, amt]) => `${category}: $${(amt / 100).toFixed(2)}`)
-    .join(', ')
-
-  const reply = [
-    `You said: "${message}".`,
-    `Current top spend: ${top || 'no data yet'}.`,
-    'This is a mock response; hook this up to Workers AI later.',
-  ].join(' ')
-
-  return { reply }
+  return await request(`/api/chat`, { method: 'POST', body: JSON.stringify({ message }) })
 }
 
 function parseInstruction(instruction: string) {

@@ -24,7 +24,7 @@ export function StatsDashboard({ summary, transactions }: StatsDashboardProps) {
         <p className="muted">Total spend across all categories.</p>
       </div>
       <div className="card">
-        <p className="eyebrow">Average txn</p>
+        <p className="eyebrow">Average Transaction Amount</p>
         <h3>{totalTx ? formatMoney(avg) : '—'}</h3>
         <p className="muted">Based on {totalTx || 'no'} transactions.</p>
       </div>

@@ -56,7 +56,7 @@ export function QuickAdd({ onCreate }: QuickAddProps) {
         <div className="grid-2">
           <label className="field">
             <span>Category</span>
-            <input value={category} onChange={(e) => setCategory(e.target.value)} placeholder="e.g. Groceries" />
+            <input value={category} onChange={(e) => setCategory(e.target.value)} placeholder="e.g. Groceries" required />
           </label>
           <label className="field">
             <span>Note</span>
